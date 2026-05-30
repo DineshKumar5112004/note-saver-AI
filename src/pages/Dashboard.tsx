@@ -104,6 +104,7 @@ const Dashboard: React.FC = () => {
             NoteSaver Pro
           </h1>
           <div className="flex items-center gap-4">
+            <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">v1.0.1-local</span>
             <span className="text-gray-300">{profile?.full_name || 'User'}</span>
             <button
               onClick={handleLogout}
