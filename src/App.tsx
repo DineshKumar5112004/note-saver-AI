@@ -8,7 +8,7 @@ import AppRoutes from '@/routes/AppRoutes';
 console.log('App.tsx is loading...');
 
 const App: React.FC = () => {
-  console.log('App component rendering');
+  console.log('App version: 1.0.1 (Local Storage Mode)');
   
   return (
     <BrowserRouter>
