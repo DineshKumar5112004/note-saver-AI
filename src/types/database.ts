@@ -29,27 +29,27 @@ export interface NoteActivity {
   created_at: string;
 }
 
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       profiles: {
         Row: Profile;
-        Insert: Omit<Profile, 'created_at'>;
-        Update: Partial<Omit<Profile, 'id' | 'created_at'>>;
+        Insert: Profile;
+        Update: Partial<Profile>;
       };
       notes: {
         Row: Note;
-        Insert: Omit<Note, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
+        Insert: Note;
+        Update: Partial<Note>;
       };
       note_activity: {
         Row: NoteActivity;
-        Insert: Omit<NoteActivity, 'id' | 'created_at'>;
-        Update: Partial<Omit<NoteActivity, 'id' | 'created_at'>>;
+        Insert: NoteActivity;
+        Update: Partial<NoteActivity>;
       };
     };
   };
-};
+}
 
 // Form types
 export interface LoginForm {
