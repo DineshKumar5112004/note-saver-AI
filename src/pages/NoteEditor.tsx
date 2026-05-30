@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Save, ArrowLeft, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
+import { notesService } from '@/services/notesService';
 
 const NoteEditor: React.FC = () => {
   const { profile, signOut, user } = useAuth();
@@ -45,33 +45,33 @@ const NoteEditor: React.FC = () => {
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
 
-      // Save to Supabase
-      const { data, error } = await supabase
-        .from('notes')
-        .insert([{
-          user_id: user.id,
-          title: title.trim(),
-          content: content.trim(),
-          category: category || null,
-          color: color,
-          tags: tagsArray,
-          is_pinned: false,
-          is_favorite: false,
-          is_archived: false,
-        }])
-        .select();
+      // Save using notesService
+      const { note, error } = await notesService.createNote(user.id, {
+        title: title.trim(),
+        content: content.trim(),
+        category: category || null,
+        color: color,
+        tags: tagsArray,
+        is_pinned: false,
+        is_favorite: false,
+        is_archived: false,
+      });
 
       if (error) {
         console.error('Error saving note:', error);
-        toast.error('Failed to save note: ' + error.message);
+        toast.error(error); // notesService already parses the error
         setSaving(false);
         return;
       }
 
-      if (data && data.length > 0) {
+      if (note) {
         toast.success('Note saved successfully!');
         // Navigate to notes list to see the saved note
         navigate('/notes');
+      } else {
+        // This should not happen if error is null
+        toast.error('Failed to save note: Unknown error');
+        setSaving(false);
       }
     } catch (err) {
       console.error('Error:', err);
