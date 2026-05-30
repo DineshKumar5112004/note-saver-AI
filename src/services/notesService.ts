@@ -84,13 +84,33 @@ export const notesService = {
     note: Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>
   ): Promise<{ note: Note | null; error: string | null }> {
     try {
+      // Diagnostic: Double check auth status directly from Supabase client
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        return { note: null, error: 'Authentication failed. Please log out and log in again.' };
+      }
+
+      // Use the ID directly from the Supabase session to be 100% safe
       const { data, error } = await supabase
         .from('notes')
-        .insert([{ ...note, user_id: userId }])
+        .insert([{ 
+          ...note, 
+          user_id: user.id 
+        }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase RLS/Insert Error Details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          sending_user_id: user.id
+        });
+        throw error;
+      }
 
       // Log activity
       if (data) {
