@@ -1,0 +1,10 @@
+.git
+node_modules
+dist
+supabase
+.env.local
+DEPLOYMENT_GUIDE.md
+IMPLEMENTATION_GUIDE.md
+PROJECT_SUMMARY.md
+QUICK_START.md
+README.md
