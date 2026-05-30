@@ -13,11 +13,9 @@ export const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
-}).refine((data) => {
-  if (data.password !== data.confirmPassword) {
-    throw new Error('Passwords do not match');
-  }
-  return true;
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 // Note form validation

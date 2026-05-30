@@ -198,10 +198,10 @@ export const notesService = {
       }
 
       const total = notes.length;
-      const favorites = notes.filter((n: Note) => n.is_favorite).length;
-      const archived = notes.filter((n: Note) => n.is_archived).length;
-      const pinned = notes.filter((n: Note) => n.is_pinned).length;
-      const totalWords = notes.reduce((sum: number, n: Note) => {
+      const favorites = notes.filter((n: any) => n.is_favorite).length;
+      const archived = notes.filter((n: any) => n.is_archived).length;
+      const pinned = notes.filter((n: any) => n.is_pinned).length;
+      const totalWords = notes.reduce((sum: number, n: any) => {
         return sum + (n.content ? n.content.trim().split(/\s+/).length : 0);
       }, 0);
 
