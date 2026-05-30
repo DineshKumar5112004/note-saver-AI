@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { notesService } from '@/services/notesService';
 import type { Note } from '@/types/database';
-import { toast } from 'sonner';
 
 const Favorites: React.FC = () => {
   const { profile, signOut, user } = useAuth();
@@ -19,13 +18,15 @@ const Favorites: React.FC = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_favorite', true)
-        .eq('is_archived', false)
-        .order('created_at', { ascending: false });
+      const { notes: data, error } = await notesService.fetchNotes(user.id, {
+        search: '',
+        category: null,
+        tags: [],
+        sortBy: 'newest',
+        showArchived: false,
+        showFavorites: true,
+        showPinned: false
+      });
 
       if (error) {
         console.error('Error fetching favorites:', error);
@@ -44,10 +45,7 @@ const Favorites: React.FC = () => {
 
   const removeFavorite = async (noteId: string) => {
     try {
-      const { error } = await supabase
-        .from('notes')
-        .update({ is_favorite: false })
-        .eq('id', noteId);
+      const { error } = await notesService.toggleFavorite(noteId, false);
 
       if (error) {
         toast.error('Failed to update');

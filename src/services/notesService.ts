@@ -1,115 +1,116 @@
-import { supabase } from '@/lib/supabase';
-import { parseError } from '@/utils/errors';
+import { getFromStorage, saveToStorage } from '@/utils/storage';
 import type { Note, NoteActivity, NoteFilter } from '@/types/database';
 import { NOTES_PER_PAGE } from '@/constants';
 
+const NOTES_STORAGE_KEY = 'notesaver_pro_notes';
+const ACTIVITY_STORAGE_KEY = 'notesaver_pro_activity';
+
+// Helper to get notes from localStorage
+const getLocalNotes = (): Note[] => {
+  return getFromStorage<Note[]>(NOTES_STORAGE_KEY, []);
+};
+
+// Helper to save notes to localStorage
+const saveLocalNotes = (notes: Note[]) => {
+  saveToStorage(NOTES_STORAGE_KEY, notes);
+};
+
 export const notesService = {
-  // Fetch notes with pagination and filters
+  // Fetch notes with pagination and filters (from localStorage)
   async fetchNotes(
     userId: string,
     filter: NoteFilter,
     page: number = 0
   ): Promise<{ notes: Note[] | null; error: string | null; hasMore: boolean }> {
     try {
-      let query = supabase
-        .from('notes')
-        .select('*')
-        .eq('user_id', userId);
+      let notes = getLocalNotes();
+      
+      // Filter by user_id
+      notes = notes.filter(n => n.user_id === userId);
 
       // Apply filters
       if (!filter.showArchived) {
-        query = query.eq('is_archived', false);
+        notes = notes.filter(n => !n.is_archived);
       } else {
-        query = query.eq('is_archived', true);
+        notes = notes.filter(n => n.is_archived);
       }
 
       if (filter.showFavorites) {
-        query = query.eq('is_favorite', true);
+        notes = notes.filter(n => n.is_favorite);
       }
 
       if (filter.showPinned) {
-        query = query.eq('is_pinned', true);
+        notes = notes.filter(n => n.is_pinned);
       }
 
       if (filter.category) {
-        query = query.eq('category', filter.category);
+        notes = notes.filter(n => n.category === filter.category);
       }
 
       if (filter.tags.length > 0) {
-        query = query.contains('tags', filter.tags);
+        notes = notes.filter(n => filter.tags.every(tag => n.tags.includes(tag)));
       }
 
       if (filter.search) {
-        query = query.or(
-          `title.ilike.%${filter.search}%,content.ilike.%${filter.search}%`
+        const searchLower = filter.search.toLowerCase();
+        notes = notes.filter(n => 
+          n.title.toLowerCase().includes(searchLower) || 
+          n.content.toLowerCase().includes(searchLower)
         );
       }
 
       // Apply sorting
-      switch (filter.sortBy) {
-        case 'newest':
-          query = query.order('created_at', { ascending: false });
-          break;
-        case 'oldest':
-          query = query.order('created_at', { ascending: true });
-          break;
-        case 'alphabetical':
-          query = query.order('title', { ascending: true });
-          break;
-        case 'recently_updated':
-          query = query.order('updated_at', { ascending: false });
-          break;
-      }
+      notes.sort((a, b) => {
+        switch (filter.sortBy) {
+          case 'newest':
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          case 'oldest':
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          case 'alphabetical':
+            return a.title.localeCompare(b.title);
+          case 'recently_updated':
+            return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+          default:
+            return 0;
+        }
+      });
 
       // Apply pagination
       const from = page * NOTES_PER_PAGE;
-      const to = from + NOTES_PER_PAGE - 1;
-      query = query.range(from, to);
+      const to = from + NOTES_PER_PAGE;
+      const paginatedNotes = notes.slice(from, to);
+      const hasMore = notes.length > to;
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const hasMore = data?.length === NOTES_PER_PAGE;
-
-      return { notes: data, error: null, hasMore };
+      return { notes: paginatedNotes, error: null, hasMore };
     } catch (error) {
-      return { notes: null, error: parseError(error), hasMore: false };
+      return { notes: null, error: 'Failed to fetch notes', hasMore: false };
     }
   },
 
-  // Create a new note
+  // Create a new note (to localStorage)
   async createNote(
     userId: string,
     note: Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>
   ): Promise<{ note: Note | null; error: string | null }> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const activeUserId = session?.user?.id || userId;
+      const notes = getLocalNotes();
+      const newNote: Note = {
+        ...note,
+        id: crypto.randomUUID(),
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-      if (!activeUserId) {
-        return { note: null, error: 'Authentication required. Please log in.' };
-      }
-
-      const { data, error } = await supabase
-        .from('notes')
-        .insert([{ 
-          ...note, 
-          user_id: activeUserId 
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
+      notes.push(newNote);
+      saveLocalNotes(notes);
 
       // Log activity
-      if (data) {
-        await this.logActivity(data.id, 'created');
-      }
+      await this.logActivity(newNote.id, 'created');
 
-      return { note: data, error: null };
+      return { note: newNote, error: null };
     } catch (error) {
-      return { note: null, error: parseError(error) };
+      return { note: null, error: 'Failed to create note' };
     }
   },
 
@@ -119,33 +120,35 @@ export const notesService = {
     updates: Partial<Note>
   ): Promise<{ note: Note | null; error: string | null }> {
     try {
-      const { data, error } = await supabase
-        .from('notes')
-        .update(updates)
-        .eq('id', noteId)
-        .select()
-        .single();
+      const notes = getLocalNotes();
+      const index = notes.findIndex(n => n.id === noteId);
+      
+      if (index === -1) throw new Error('Note not found');
 
-      if (error) throw error;
+      const updatedNote = {
+        ...notes[index],
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
 
-      return { note: data, error: null };
+      notes[index] = updatedNote;
+      saveLocalNotes(notes);
+
+      return { note: updatedNote, error: null };
     } catch (error) {
-      return { note: null, error: parseError(error) };
+      return { note: null, error: 'Failed to update note' };
     }
   },
 
   // Delete a note
   async deleteNote(noteId: string): Promise<{ error: string | null }> {
     try {
-      const { error } = await supabase
-        .from('notes')
-        .delete()
-        .eq('id', noteId);
-
-      if (error) throw error;
+      const notes = getLocalNotes();
+      const filteredNotes = notes.filter(n => n.id !== noteId);
+      saveLocalNotes(filteredNotes);
       return { error: null };
     } catch (error) {
-      return { error: parseError(error) };
+      return { error: 'Failed to delete note' };
     }
   },
 
@@ -172,16 +175,11 @@ export const notesService = {
   // Get a single note by ID
   async getNote(noteId: string): Promise<{ note: Note | null; error: string | null }> {
     try {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('id', noteId)
-        .single();
-
-      if (error) throw error;
-      return { note: data, error: null };
+      const notes = getLocalNotes();
+      const note = notes.find(n => n.id === noteId);
+      return { note: note || null, error: note ? null : 'Note not found' };
     } catch (error) {
-      return { note: null, error: parseError(error) };
+      return { note: null, error: 'Failed to get note' };
     }
   },
 
@@ -195,36 +193,20 @@ export const notesService = {
     error: string | null;
   }> {
     try {
-      const { data: notes, error } = await supabase
-        .from('notes')
-        .select('is_favorite, is_archived, is_pinned, content')
-        .eq('user_id', userId)
-        .eq('is_archived', false);
-
-      if (error) throw error;
-
-      if (!notes) {
-        return { total: 0, favorites: 0, archived: 0, pinned: 0, totalWords: 0, error: null };
-      }
-
-      const total = notes.length;
-      const favorites = notes.filter((n: any) => n.is_favorite).length;
-      const archived = notes.filter((n: any) => n.is_archived).length;
-      const pinned = notes.filter((n: any) => n.is_pinned).length;
-      const totalWords = notes.reduce((sum: number, n: any) => {
+      const notes = getLocalNotes().filter(n => n.user_id === userId);
+      
+      const activeNotes = notes.filter(n => !n.is_archived);
+      const total = activeNotes.length;
+      const favorites = activeNotes.filter(n => n.is_favorite).length;
+      const archived = notes.filter(n => n.is_archived).length;
+      const pinned = activeNotes.filter(n => n.is_pinned).length;
+      const totalWords = activeNotes.reduce((sum, n) => {
         return sum + (n.content ? n.content.trim().split(/\s+/).length : 0);
       }, 0);
 
       return { total, favorites, archived, pinned, totalWords, error: null };
     } catch (error) {
-      return {
-        total: 0,
-        favorites: 0,
-        archived: 0,
-        pinned: 0,
-        totalWords: 0,
-        error: parseError(error),
-      };
+      return { total: 0, favorites: 0, archived: 0, pinned: 0, totalWords: 0, error: 'Failed to fetch stats' };
     }
   },
 
@@ -234,14 +216,17 @@ export const notesService = {
     action: string
   ): Promise<{ error: string | null }> {
     try {
-      const { error } = await supabase
-        .from('note_activity')
-        .insert([{ note_id: noteId, action }]);
-
-      if (error) throw error;
+      const activities = getFromStorage<NoteActivity[]>(ACTIVITY_STORAGE_KEY, []);
+      activities.unshift({
+        id: crypto.randomUUID(),
+        note_id: noteId,
+        action,
+        created_at: new Date().toISOString()
+      });
+      saveToStorage(ACTIVITY_STORAGE_KEY, activities.slice(0, 50)); // Keep last 50
       return { error: null };
     } catch (error) {
-      return { error: parseError(error) };
+      return { error: 'Failed to log activity' };
     }
   },
 
@@ -251,33 +236,30 @@ export const notesService = {
     limit: number = 10
   ): Promise<{ activities: (NoteActivity & { note: Note })[] | null; error: string | null }> {
     try {
-      const { data, error } = await supabase
-        .from('note_activity')
-        .select(`
-          *,
-          note:notes(*)
-        `)
-        .eq('note.user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      const activities = getFromStorage<NoteActivity[]>(ACTIVITY_STORAGE_KEY, []);
+      const notes = getLocalNotes();
+      
+      const userActivities = activities
+        .map(activity => ({
+          ...activity,
+          note: notes.find(n => n.id === activity.note_id)!
+        }))
+        .filter(a => a.note && a.note.user_id === userId)
+        .slice(0, limit);
 
-      if (error) throw error;
-      return { activities: data, error: null };
+      return { activities: userActivities, error: null };
     } catch (error) {
-      return { activities: null, error: parseError(error) };
+      return { activities: null, error: 'Failed to fetch activity' };
     }
   },
 
   // Duplicate a note
   async duplicateNote(noteId: string): Promise<{ note: Note | null; error: string | null }> {
     try {
-      const { note: originalNote, error: fetchError } = await this.getNote(noteId);
-      
-      if (fetchError || !originalNote) {
-        throw new Error(fetchError || 'Note not found');
-      }
+      const { note: originalNote } = await this.getNote(noteId);
+      if (!originalNote) throw new Error('Note not found');
 
-      const { note, error } = await this.createNote(originalNote.user_id, {
+      return await this.createNote(originalNote.user_id, {
         title: `${originalNote.title} (Copy)`,
         content: originalNote.content,
         color: originalNote.color,
@@ -287,10 +269,8 @@ export const notesService = {
         is_favorite: false,
         is_archived: false,
       });
-
-      return { note, error };
     } catch (error) {
-      return { note: null, error: parseError(error) };
+      return { note: null, error: 'Failed to duplicate note' };
     }
   },
 };

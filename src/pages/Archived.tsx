@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { notesService } from '@/services/notesService';
 import type { Note } from '@/types/database';
-import { toast } from 'sonner';
 
 const Archived: React.FC = () => {
   const { profile, signOut, user } = useAuth();
@@ -19,12 +18,15 @@ const Archived: React.FC = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_archived', true)
-        .order('created_at', { ascending: false });
+      const { notes: data, error } = await notesService.fetchNotes(user.id, {
+        search: '',
+        category: null,
+        tags: [],
+        sortBy: 'newest',
+        showArchived: true,
+        showFavorites: false,
+        showPinned: false
+      });
 
       if (error) {
         console.error('Error fetching archived:', error);
@@ -43,10 +45,7 @@ const Archived: React.FC = () => {
 
   const restoreNote = async (noteId: string) => {
     try {
-      const { error } = await supabase
-        .from('notes')
-        .update({ is_archived: false })
-        .eq('id', noteId);
+      const { error } = await notesService.restoreNote(noteId);
 
       if (error) {
         toast.error('Failed to restore');

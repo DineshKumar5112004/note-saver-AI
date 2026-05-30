@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { notesService } from '@/services/notesService';
 import type { Note } from '@/types/database';
 import { toast } from 'sonner';
 
@@ -19,12 +19,15 @@ const NotesList: React.FC = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_archived', false)
-        .order('created_at', { ascending: false });
+      const { notes: data, error } = await notesService.fetchNotes(user.id, {
+        search: '',
+        category: null,
+        tags: [],
+        sortBy: 'newest',
+        showArchived: false,
+        showFavorites: false,
+        showPinned: false
+      });
 
       if (error) {
         console.error('Error fetching notes:', error);
@@ -43,10 +46,7 @@ const NotesList: React.FC = () => {
 
   const toggleFavorite = async (noteId: string, isFavorite: boolean) => {
     try {
-      const { error } = await supabase
-        .from('notes')
-        .update({ is_favorite: !isFavorite })
-        .eq('id', noteId);
+      const { error } = await notesService.toggleFavorite(noteId, !isFavorite);
 
       if (error) {
         toast.error('Failed to update favorite');
@@ -62,10 +62,7 @@ const NotesList: React.FC = () => {
 
   const toggleArchive = async (noteId: string, isArchived: boolean) => {
     try {
-      const { error } = await supabase
-        .from('notes')
-        .update({ is_archived: !isArchived })
-        .eq('id', noteId);
+      const { error } = await notesService.toggleArchive(noteId, !isArchived);
 
       if (error) {
         toast.error('Failed to archive note');
@@ -85,10 +82,7 @@ const NotesList: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('notes')
-        .delete()
-        .eq('id', noteId);
+      const { error } = await notesService.deleteNote(noteId);
 
       if (error) {
         toast.error('Failed to delete note');

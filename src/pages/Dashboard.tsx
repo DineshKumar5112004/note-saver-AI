@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { notesService } from '@/services/notesService';
 
 const Dashboard: React.FC = () => {
   const { profile, signOut, user } = useAuth();
@@ -56,35 +56,12 @@ const Dashboard: React.FC = () => {
     if (!user) return;
 
     try {
-      // Fetch total notes (non-archived)
-      const { count: total } = await supabase
-        .from('notes')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_archived', false);
+      const { total, favorites, archived, pinned, error } = await notesService.getNoteStatistics(user.id);
 
-      // Fetch favorites
-      const { count: favorites } = await supabase
-        .from('notes')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_favorite', true)
-        .eq('is_archived', false);
-
-      // Fetch archived
-      const { count: archived } = await supabase
-        .from('notes')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_archived', true);
-
-      // Fetch pinned
-      const { count: pinned } = await supabase
-        .from('notes')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_pinned', true)
-        .eq('is_archived', false);
+      if (error) {
+        console.error('Error fetching stats:', error);
+        return;
+      }
 
       setStats({
         total: total || 0,
