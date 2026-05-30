@@ -1,55 +1,144 @@
-// Database type definitions for Supabase
-
-export interface Profile {
-  id: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  created_at: string;
-}
-
-export interface Note {
-  id: string;
-  user_id: string;
-  title: string;
-  content: string;
-  color: string;
-  category: string | null;
-  tags: string[];
-  is_pinned: boolean;
-  is_favorite: boolean;
-  is_archived: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface NoteActivity {
-  id: string;
-  note_id: string;
-  action: string;
-  created_at: string;
-}
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export interface Database {
   public: {
     Tables: {
       profiles: {
-        Row: Profile;
-        Insert: Profile;
-        Update: Partial<Profile>;
-      };
+        Row: {
+          id: string
+          full_name: string | null
+          avatar_url: string | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          full_name?: string | null
+          avatar_url?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          full_name?: string | null
+          avatar_url?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       notes: {
-        Row: Note;
-        Insert: Note;
-        Update: Partial<Note>;
-      };
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          content: string
+          color: string
+          category: string | null
+          tags: string[]
+          is_pinned: boolean
+          is_favorite: boolean
+          is_archived: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          content?: string
+          color?: string
+          category?: string | null
+          tags?: string[]
+          is_pinned?: boolean
+          is_favorite?: boolean
+          is_archived?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          content?: string
+          color?: string
+          category?: string | null
+          tags?: string[]
+          is_pinned?: boolean
+          is_favorite?: boolean
+          is_archived?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       note_activity: {
-        Row: NoteActivity;
-        Insert: NoteActivity;
-        Update: Partial<NoteActivity>;
-      };
-    };
-  };
+        Row: {
+          id: string
+          note_id: string
+          action: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          note_id: string
+          action: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          note_id?: string
+          action?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_activity_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
 }
+
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type Note = Database['public']['Tables']['notes']['Row'];
+export type NoteActivity = Database['public']['Tables']['note_activity']['Row'];
 
 // Form types
 export interface LoginForm {
