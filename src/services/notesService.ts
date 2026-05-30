@@ -84,16 +84,12 @@ export const notesService = {
     note: Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>
   ): Promise<{ note: Note | null; error: string | null }> {
     try {
-      // Diagnostic: Get session to ensure auth is valid
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+      const { data: { session } } = await supabase.auth.getSession();
       const activeUserId = session?.user?.id || userId;
 
       if (!activeUserId) {
-        return { note: null, error: 'Authentication failed. Please log out and log in again.' };
+        return { note: null, error: 'Authentication required. Please log in.' };
       }
-
-      console.log('Attempting to create note for user:', activeUserId);
 
       const { data, error } = await supabase
         .from('notes')
@@ -104,16 +100,7 @@ export const notesService = {
         .select()
         .single();
 
-      if (error) {
-        console.error('Supabase RLS/Insert Error Details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          sending_user_id: activeUserId
-        });
-        throw error;
-      }
+      if (error) throw error;
 
       // Log activity
       if (data) {

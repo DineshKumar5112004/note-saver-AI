@@ -59,8 +59,7 @@ const NoteEditor: React.FC = () => {
 
       if (error) {
         console.error('Error saving note:', error);
-        // Show the specific database error to help us find the cause
-        toast.error(`Database Error: ${error}`); 
+        toast.error(error); 
         setSaving(false);
         return;
       }
