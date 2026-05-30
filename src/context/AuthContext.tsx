@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authService } from '@/services/authService';
+import { saveToStorage } from '@/utils/storage';
 import type { Profile } from '@/types/database';
 
 
