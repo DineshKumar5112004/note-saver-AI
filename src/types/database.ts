@@ -45,7 +45,7 @@ export type Database = {
       note_activity: {
         Row: NoteActivity;
         Insert: Omit<NoteActivity, 'id' | 'created_at'>;
-        Update: never;
+        Update: Partial<Omit<NoteActivity, 'id' | 'created_at'>>;
       };
     };
   };
